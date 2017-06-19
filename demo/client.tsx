@@ -4,11 +4,11 @@ import { render } from 'react-dom';
 import * as ReactMuiTree from '../src/ReactMuiTree';
 require('./styles.scss');
 
-const nodes: ReactMuiTree.IMuiTreeNode[] = [
+const nodes: ReactMuiTree.IReactMuiTreeNode[] = [
     {
         key: 'node1',
         displayName: 'Node 1',
-        children: [
+        childNodes: [
             {
                 key: 'node1.1',
                 displayName: 'Node 1.1',
@@ -23,8 +23,8 @@ const nodes: ReactMuiTree.IMuiTreeNode[] = [
 
 render(
     <div>
-        <ReactMuiTree.Component nodes={nodes}>
-        </ReactMuiTree.Component>
-    </div>,
+        <ReactMuiTree.ReactMuiTree nodes={nodes} expandedNodeKey={'node1'} onClick={(n) => console.log(n)}>
+        </ReactMuiTree.ReactMuiTree>
+    </div >,
     document.getElementById('app_container')
 );

@@ -12,9 +12,10 @@ export interface IReactMuiTreeNode {
 /**
  * Node props
  */
-interface IReactMuiTreeNodeProps extends IReactMuiTreeNode {
-    collapsed: boolean;
-    onCollapse: (key: string, collapsed: boolean) => void
+interface IReactMuiTreeNodeProps {
+    expandedNodesMap: { [key: string]: boolean; };
+    node: IReactMuiTreeNode;
+    onClick: (node: IReactMuiTreeNode) => void;
 }
 
 /**
@@ -23,6 +24,7 @@ interface IReactMuiTreeNodeProps extends IReactMuiTreeNode {
 interface IReactMuiTreeProps {
     expandedNodeKey: string
     nodes: IReactMuiTreeNode[];
+    onClick: (node: IReactMuiTreeNode) => void;
 }
 
 interface IReactMuiTreeState {
@@ -32,26 +34,39 @@ interface IReactMuiTreeState {
     expandedNodesMap: { [key: string]: boolean; };
 }
 
-
 class ReactMuiTreeNode extends React.Component<IReactMuiTreeNodeProps, {}> {
     constructor(props: IReactMuiTreeNodeProps) {
         super(props);
-        this.handleChildNodeCollapsedStateChange = this.handleChildNodeCollapsedStateChange.bind(this);
+        this.handleClick = this.handleClick.bind(this);
     }
 
-    handleChildNodeCollapsedStateChange() {
-
+    private handleClick() {
+        const { onClick, node } = this.props;
+        onClick(node);
     }
 
     render() {
-        const { displayName, collapsed, onCollapse } = this.props;
-        const children: JSX.Element[] = this.props.childNodes ? this.props.childNodes.map((c) => <ReactMuiTreeNode {...c} />) : null;
+        const {
+            node,
+            onClick,
+            expandedNodesMap,
+        } = this.props;
+
+        const childProps = {
+            expandedNodesMap,
+            onClick,
+        };
+
+        const children: JSX.Element[] = node.childNodes ? node.childNodes.map((node) => <ReactMuiTreeNode node={node} {...childProps} />) : null;
+
+        const collapsed = expandedNodesMap[node.key] === false;
+
         return <div className="react-mui-tree-node">
-            <div className="react-mui-tree-node-content">
+            <div className="react-mui-tree-node-content" onClick={this.handleClick}>
                 <div className="react-mui-tree-node-icon">
                 </div>
                 <div className="react-mui-tree-node-text">
-                    {displayName}
+                    {node.displayName}
                 </div>
                 <div className="react-mui-tree-node-collapse-button">
                 </div>
@@ -63,16 +78,46 @@ class ReactMuiTreeNode extends React.Component<IReactMuiTreeNodeProps, {}> {
     }
 }
 
-export class Component extends React.Component<IReactMuiTreeProps, {}> {
+export class ReactMuiTree extends React.Component<IReactMuiTreeProps, IReactMuiTreeState> {
     constructor(props: IReactMuiTreeProps) {
         super(props);
         this.populateParentNodesMap = this.populateParentNodesMap.bind(this);
-        this.getInitialExpandedNodesMap = this.getInitialExpandedNodesMap.bind(this);
+        this.getExpandedNodesMap = this.getExpandedNodesMap.bind(this);
+        this.handleOnNodeClick = this.handleOnNodeClick.bind(this);
 
-        this.populateParentNodesMap(props.nodes, props.expandedNodeKey);
+        const { nodes, expandedNodeKey } = this.props;
+
+        // This will populate a cache so it will be easier to know which are the parent nodes of a given node
+        this.populateParentNodesMap(nodes);
+
         this.setState({
-            expandedNodesMap: this.getInitialExpandedNodesMap(props.nodes, props.expandedNodeKey)
+            expandedNodesMap: this.getExpandedNodesMap(nodes, expandedNodeKey)
         });
+    }
+
+    private handleOnNodeClick(node: IReactMuiTreeNode): void {
+        if (!node) throw Error('Argument \'node\' should be truthy');
+        const { nodes, onClick } = this.props;
+        // determine if it's a collapse or a click
+        if (node.childNodes && node.childNodes.length) {
+            // it's a collapse event
+            // let's check the state of the node
+            const nodeExpanded = this.state.expandedNodesMap[node.key];
+            let newExpandedState;
+            if (nodeExpanded) {
+                // we need to collapse it
+                newExpandedState = { ...this.state.expandedNodesMap };
+                newExpandedState[node.key] = false;
+                this.setState({ expandedNodesMap: newExpandedState });
+            }
+            else {
+                // we need to expand it
+                newExpandedState = this.getExpandedNodesMap(nodes, node.key);
+            }
+            this.setState({ expandedNodesMap: newExpandedState });
+        } else {
+            onClick(node);
+        }
     }
 
     /**
@@ -80,18 +125,27 @@ export class Component extends React.Component<IReactMuiTreeProps, {}> {
      */
     parentNodesMap: { [key: string]: string[] }
 
-    getInitialExpandedNodesMap(
-        nodes: IReactMuiTreeNode[],
-        expandedNodeKey: string,
-        expandedNodesMap: { [key: string]: boolean; } = {}): { [key: string]: boolean; } {
+    /**
+     * Returns a map that says which nodes are expanded and collapsed
+     * @param nodes The hierarchical list of nodes
+     * @param expandedNodeKey The key of the expanded node
+     */
+    private getExpandedNodesMap(nodes: IReactMuiTreeNode[], expandedNodeKey: string): { [key: string]: boolean; } {
+        if (!expandedNodeKey) throw Error('Argument \'expandedNodeKey\' should be truthy');
+        if (!nodes) throw Error('Argument \'nodes\' should be truthy');
 
-            
+        const results: { [key: string]: boolean; } = {};
+        const parents = this.parentNodesMap[expandedNodeKey];
 
-        return expandedNodesMap;
+        for (const node of nodes) {
+            // the node will be expanded if it is the expandedNodeKey or one of its parents
+            results[node.key] = node.key === expandedNodeKey || parents.indexOf(node.key) != -1;
+        }
+        return results;
     }
 
     /**
-     * Populates the parentNodesMap property
+     * Populates the parentNodesMap property. The parentNodesMap propertyv maps a given key to all the parents of that key
      * @param nodes The hierarchical list of nodes
      * @param parentNodeKeys A list of all nodes to be added as parent node of each node
      */
@@ -105,7 +159,13 @@ export class Component extends React.Component<IReactMuiTreeProps, {}> {
     }
 
     render() {
-        const children: JSX.Element[] = this.props.nodes ? this.props.nodes.map((n) => <ReactMuiTreeNode {...n} />) : null;
+        const props = {
+            expandedNodesMap: this.state.expandedNodesMap,
+            onClick: this.handleOnNodeClick,
+        };
+        const children: JSX.Element[] = this.props.nodes
+            ? this.props.nodes.map((node) => <ReactMuiTreeNode node={node} {...props} />)
+            : null;
         return (
             <div className="react-mui-tree">
                 {children}
