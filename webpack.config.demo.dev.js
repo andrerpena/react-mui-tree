@@ -23,7 +23,7 @@ module.exports = {
 
     module: {
         rules: [
-            { test: /\.ts|\.tsx/, use: ['react-hot-loader/webpack', 'awesome-typescript-loader'] },
+            { test: /\.ts|\.tsx/, use: ['awesome-typescript-loader'] },
             { test: /\.css/, use: ['style-loader', 'css-loader'] },
             { test: /\.scss$/, use: ['style-loader', 'css-loader', 'sass-loader'] },
             { test: /\.jpe?g$|\.gif$|\.png$|\.ico$/, use: ['file-loader?name=[name].[ext]'] },
